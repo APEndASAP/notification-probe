@@ -1,4 +1,4 @@
-name: Build Probe APK
+name: Build Conversation Probe APK
 
 on:
   workflow_dispatch:
@@ -12,23 +12,118 @@ jobs:
       - name: 检出代码
         uses: actions/checkout@v4
 
+      - name: 安装 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
       - name: 安装 Java 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: 设置 Gradle
-        uses: gradle/actions/setup-gradle@v3
-        with:
-          gradle-version: '8.2'
+      - name: 安装依赖
+        run: npm install
 
-      - name: 构建 Debug APK
-        run: gradle assembleDebug --no-daemon
+      # bm-conversation-notify 为本地 file: 依赖，强制真实目录拷贝固化，
+      # 确保插件 android 源码被 Capacitor 识别编译。
+      - name: 固化本地会话通知插件 bm-conversation-notify
+        run: |
+          rm -rf node_modules/bm-conversation-notify
+          cp -r bm-conversation-notify node_modules/bm-conversation-notify
+          echo "插件已固化到 node_modules"
+          ls -la node_modules/bm-conversation-notify/android/src/main/java/com/bairimeng/conversation/
+
+      - name: 生成安卓原生壳
+        run: npx cap add android
+
+      # 注册 BmConversationNotify 插件到 MainActivity（Capacitor 6 不会自动实例化自定义插件）
+      - name: 注册插件到 MainActivity
+        run: |
+          cat > /tmp/register.js <<'NODE_EOF'
+          const fs = require('fs');
+          const path = require('path');
+          function walk(dir, out) {
+            for (const n of fs.readdirSync(dir)) {
+              const f = path.join(dir, n);
+              const st = fs.statSync(f);
+              if (st.isDirectory()) walk(f, out);
+              else if (n === 'MainActivity.java') out.push(f);
+            }
+          }
+          const files = [];
+          walk('android/app/src/main/java', files);
+          if (!files.length) { console.error('MainActivity.java 未找到'); process.exit(1); }
+          const p = files[0];
+          let s = fs.readFileSync(p, 'utf8');
+          if (s.includes('registerPlugin(BmConversationNotifyPlugin.class)')) {
+            console.log('已注册，跳过'); process.exit(0);
+          }
+          const imp = 'import com.bairimeng.conversation.BmConversationNotifyPlugin;';
+          if (!s.includes(imp)) s = s.replace(/(package [\s\S]*?;)/, '$1\n\n' + imp);
+          if (!s.includes('import android.os.Bundle;')) {
+            s = s.replace(/(import com\.getcapacitor\.BridgeActivity;)/, 'import android.os.Bundle;\n$1');
+          }
+          if (s.includes('public void onCreate(')) {
+            s = s.replace(/(super\.onCreate\(savedInstanceState\);)/,
+              '    registerPlugin(BmConversationNotifyPlugin.class);\n    $1');
+          } else {
+            s = s.replace(/(public class MainActivity extends BridgeActivity)\s*\{\s*\}/,
+              '$1 {\n  @Override\n  public void onCreate(Bundle savedInstanceState) {\n    registerPlugin(BmConversationNotifyPlugin.class);\n    super.onCreate(savedInstanceState);\n  }\n}');
+          }
+          fs.writeFileSync(p, s);
+          console.log('MainActivity.java 已注册:\n' + s);
+          NODE_EOF
+          node /tmp/register.js
+
+      # 注入通知权限（Android 13+ 必须声明 POST_NOTIFICATIONS，否则静默丢弃通知）
+      - name: 注入通知权限 + compileSdk 35
+        run: |
+          cat > /tmp/inject.js <<'NODE_EOF'
+          const fs = require('fs');
+          const p = 'android/app/src/main/AndroidManifest.xml';
+          let m = fs.readFileSync(p, 'utf8');
+          if (!m.includes('android.permission.POST_NOTIFICATIONS')) {
+            m = m.replace(/<application/, '    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n    <application');
+            fs.writeFileSync(p, m);
+            console.log('POST_NOTIFICATIONS injected');
+          }
+          const vp = 'android/variables.gradle';
+          let sv = fs.readFileSync(vp, 'utf8');
+          if (/compileSdkVersion\s*=\s*34/.test(sv)) {
+            sv = sv.replace(/compileSdkVersion\s*=\s*34/, 'compileSdkVersion = 35');
+            fs.writeFileSync(vp, sv);
+            console.log('compileSdkVersion 34 -> 35');
+          }
+          NODE_EOF
+          node /tmp/inject.js
+
+      - name: 同步网页资源到安卓工程
+        run: npx cap sync android
+
+      - name: 递增 versionCode
+        run: |
+          cat > /tmp/bump.js <<'NODE_EOF'
+          const fs = require('fs');
+          const p = 'android/app/build.gradle';
+          let s = fs.readFileSync(p, 'utf8');
+          const vc = Math.floor(Date.now() / 60000);
+          s = s.replace(/versionCode\s+\d+/, 'versionCode ' + vc);
+          fs.writeFileSync(p, s);
+          console.log('versionCode -> ' + vc);
+          NODE_EOF
+          node /tmp/bump.js
+
+      - name: 构建 APK（Debug）
+        working-directory: android
+        run: |
+          chmod +x ./gradlew
+          ./gradlew assembleDebug --no-daemon
 
       - name: 上传 APK 产物
         uses: actions/upload-artifact@v4
         with:
-          name: probe-apk
-          path: app/build/outputs/apk/debug/*.apk
-          retention-days: 30
+          name: conversation-probe-apk
+          path: android/app/build/outputs/apk/debug/*.apk
+          retention-days: 90
