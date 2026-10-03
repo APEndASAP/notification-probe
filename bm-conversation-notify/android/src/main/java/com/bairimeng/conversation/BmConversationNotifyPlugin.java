@@ -136,7 +136,6 @@ public class BmConversationNotifyPlugin extends Plugin {
                     .setLongLived(true)
                     .setPerson(person)
                     .setShortLabel(senderName)
-                    .setCategories(java.util.Collections.singleton(ShortcutInfoCompat.SHORTCUT_CATEGORY_CONVERSATION))
                     .build();
             boolean pushed = ShortcutManagerCompat.pushDynamicShortcut(getContext(), shortcut);
             android.util.Log.i("BmConversation", "pushDynamicShortcut result=" + pushed + " id=" + conversationId);
