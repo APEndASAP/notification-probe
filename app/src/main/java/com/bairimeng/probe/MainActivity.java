@@ -1,19 +1,25 @@
 package com.bairimeng.probe;
 
 import android.app.Activity;
+import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
 /**
- * 探针主界面：启动即触发一次，并提供一个按钮可重复触发。
+ * 探针主界面：启动即请求通知权限并触发一次，另提供一个按钮可重复触发。
  * 也可用 adb 广播触发：adb shell am broadcast -a com.bairimeng.probe.SHOW
  */
 public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        if (Build.VERSION.SDK_INT >= 33) {
+            requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 100);
+        }
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);

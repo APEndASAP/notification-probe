@@ -53,10 +53,14 @@ public class ConversationProbe {
     private static void registerShortcut(Context context) {
         try {
             Person sender = new Person.Builder().setName(SENDER_NAME).build();
+            Intent launch = new Intent(context, MainActivity.class);
+            launch.setAction(Intent.ACTION_MAIN);
+            launch.addCategory(Intent.CATEGORY_LAUNCHER);
             ShortcutInfoCompat shortcut = new ShortcutInfoCompat.Builder(context, CONVERSATION_ID)
                     .setLongLived(true)
                     .setPerson(sender)
                     .setShortLabel(SENDER_NAME)
+                    .setIntent(launch)
                     .setIcon(IconCompat.createWithResource(context, android.R.drawable.ic_dialog_info))
                     .build();
             boolean ok = ShortcutManagerCompat.pushDynamicShortcut(context, shortcut);
