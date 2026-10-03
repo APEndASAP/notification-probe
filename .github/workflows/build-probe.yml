@@ -65,12 +65,19 @@ jobs:
           if (!s.includes('import android.os.Bundle;')) {
             s = s.replace(/(import com\.getcapacitor\.BridgeActivity;)/, 'import android.os.Bundle;\n$1');
           }
+          if (!s.includes('import android.Manifest;')) {
+            s = s.replace(/(import com\.getcapacitor\.BridgeActivity;)/, 'import android.Manifest;\n$1');
+          }
+          if (!s.includes('import android.os.Build;')) {
+            s = s.replace(/(import com\.getcapacitor\.BridgeActivity;)/, 'import android.os.Build;\n$1');
+          }
+          const permCall = 'if (Build.VERSION.SDK_INT >= 33) { requestPermissions(new String[]{ android.Manifest.permission.POST_NOTIFICATIONS }, 1001); }';
           if (s.includes('public void onCreate(')) {
             s = s.replace(/(super\.onCreate\(savedInstanceState\);)/,
-              '    registerPlugin(BmConversationNotifyPlugin.class);\n    $1');
+              '    registerPlugin(BmConversationNotifyPlugin.class);\n    ' + permCall + '\n    $1');
           } else {
             s = s.replace(/(public class MainActivity extends BridgeActivity)\s*\{\s*\}/,
-              '$1 {\n  @Override\n  public void onCreate(Bundle savedInstanceState) {\n    registerPlugin(BmConversationNotifyPlugin.class);\n    super.onCreate(savedInstanceState);\n  }\n}');
+              '$1 {\n  @Override\n  public void onCreate(Bundle savedInstanceState) {\n    registerPlugin(BmConversationNotifyPlugin.class);\n    ' + permCall + '\n    super.onCreate(savedInstanceState);\n  }\n}');
           }
           fs.writeFileSync(p, s);
           console.log('MainActivity.java 已注册:\n' + s);
