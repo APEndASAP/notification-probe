@@ -1,0 +1,15 @@
+{
+  "name": "notification-probe-host",
+  "version": "1.0.0",
+  "description": "白日梦会话式通知探针 Capacitor 宿主工程（独立，不接入白日梦）",
+  "private": true,
+  "scripts": {
+    "build": "echo 'no web build needed'"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.0.0",
+    "@capacitor/core": "^6.0.0",
+    "@capacitor/cli": "^6.0.0",
+    "bm-conversation-notify": "file:./bm-conversation-notify"
+  }
+}

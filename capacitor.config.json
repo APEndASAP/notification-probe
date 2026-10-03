@@ -1,0 +1,9 @@
+{
+  "appId": "com.bairimeng.probe",
+  "appName": "通知探针",
+  "webDir": "www",
+  "bundledWebRuntime": false,
+  "android": {
+    "allowMixedContent": true
+  }
+}
